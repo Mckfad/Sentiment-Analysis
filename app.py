@@ -287,14 +287,20 @@ with tab1:
                 if st.button(f"Ex.{i+1}", key=f"ex{i}", use_container_width=True):
                     st.session_state.example_text = ex
 
+        st.markdown("**Exemples rapides**")
+        btn_cols = st.columns(5)
+        for i, (bcol, ex) in enumerate(zip(btn_cols, EXAMPLES)):
+            with bcol:
+                if st.button(f"Ex.{i+1}", key=f"ex{i}", use_container_width=True):
+                    st.session_state.text_input = ex
+                    st.rerun()
+
         user_text = st.text_area(
             "Entrez un avis (francais ou anglais) :",
-            value=st.session_state.example_text,
             height=140,
             placeholder="Ex: Ce produit est absolument incroyable !",
             key="text_input",
         )
-
         if st.button("🔍 Analyser", type="primary", use_container_width=True):
             if not user_text.strip():
                 st.warning("Veuillez entrer un texte.")
