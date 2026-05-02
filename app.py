@@ -275,108 +275,108 @@ with tab1:
                 st.session_state.history = []
                 st.rerun()
 
-    with col_main:
-    if st.session_state.clear_input:
-        st.session_state.text_input = ""
-        st.session_state.clear_input = False
-
-    st.markdown("**Exemples rapides**")
-    btn_cols = st.columns(5)
-    for i, (bcol, ex) in enumerate(zip(btn_cols, EXAMPLES)):
-        with bcol:
-            if st.button(f"Ex.{i+1}", key=f"ex{i}", use_container_width=True):
-                st.session_state["text_input"] = ex
+        with col_main:
+        if st.session_state.clear_input:
+            st.session_state.text_input = ""
+            st.session_state.clear_input = False
+    
+        st.markdown("**Exemples rapides**")
+        btn_cols = st.columns(5)
+        for i, (bcol, ex) in enumerate(zip(btn_cols, EXAMPLES)):
+            with bcol:
+                if st.button(f"Ex.{i+1}", key=f"ex{i}", use_container_width=True):
+                    st.session_state["text_input"] = ex
+                    st.rerun()
+    
+        user_text = st.text_area(
+            "Entrez un avis (francais ou anglais) :",
+            height=140,
+            placeholder="Ex: Ce produit est absolument incroyable !",
+            key="text_input",
+        )
+    
+        if st.button("🔍 Analyser", type="primary", use_container_width=True):
+            if not user_text.strip():
+                st.warning("Veuillez entrer un texte.")
+            else:
+                with st.spinner("Analyse en cours..."):
+                    result = predict(user_text, pipe, translator)
+    
+                st.session_state.last_result = {
+                    "text":       user_text,
+                    "label":      result["label"],
+                    "score":      result["score"],
+                    "lang":       result["lang"],
+                    "translated": result.get("translated"),
+                }
+                st.session_state.history.append({
+                    "text":  user_text,
+                    "label": result["label"],
+                    "score": result["score"],
+                    "lang":  result["lang"],
+                })
+                st.session_state.clear_input = True
                 st.rerun()
-
-    user_text = st.text_area(
-        "Entrez un avis (francais ou anglais) :",
-        height=140,
-        placeholder="Ex: Ce produit est absolument incroyable !",
-        key="text_input",
-    )
-
-    if st.button("🔍 Analyser", type="primary", use_container_width=True):
-        if not user_text.strip():
-            st.warning("Veuillez entrer un texte.")
-        else:
-            with st.spinner("Analyse en cours..."):
-                result = predict(user_text, pipe, translator)
-
-            st.session_state.last_result = {
-                "text":       user_text,
-                "label":      result["label"],
-                "score":      result["score"],
-                "lang":       result["lang"],
-                "translated": result.get("translated"),
+    
+        # ✅ FIX : récupération correcte du résultat
+        if st.session_state.last_result:
+            r = st.session_state.last_result
+    
+            CFG = {
+                "POSITIVE": ("#052e16", "#16a34a", "0 0 18px rgba(74,222,128,0.35)",  "#4ade80", "😊", "POSITIF"),
+                "NEGATIVE": ("#1c0707", "#dc2626", "0 0 18px rgba(248,113,113,0.35)", "#f87171", "😞", "NÉGATIF"),
+                "NEUTRAL":  ("#1c1917", "#78716c", "0 0 18px rgba(168,162,158,0.25)", "#a8a29e", "😐", "NEUTRE"),
             }
-            st.session_state.history.append({
-                "text":  user_text,
-                "label": result["label"],
-                "score": result["score"],
-                "lang":  result["lang"],
-            })
-            st.session_state.clear_input = True
-            st.rerun()
-
-    # ✅ FIX : récupération correcte du résultat
-    if st.session_state.last_result:
-        r = st.session_state.last_result
-
-        CFG = {
-            "POSITIVE": ("#052e16", "#16a34a", "0 0 18px rgba(74,222,128,0.35)",  "#4ade80", "😊", "POSITIF"),
-            "NEGATIVE": ("#1c0707", "#dc2626", "0 0 18px rgba(248,113,113,0.35)", "#f87171", "😞", "NÉGATIF"),
-            "NEUTRAL":  ("#1c1917", "#78716c", "0 0 18px rgba(168,162,158,0.25)", "#a8a29e", "😐", "NEUTRE"),
-        }
-
-        import html as _html
-
-        bg, border, glow, color, emoji_r, lbl = CFG[r["label"]]
-        pct        = int(r["score"] * 100)
-        safe_text  = _html.escape(r["text"])
-        safe_transl = _html.escape(r["translated"]) if r.get("translated") else None
-
-        lang_badge = (
-            f"<span style='background:#1e3a5f;color:#93c5fd;padding:2px 8px;"
-            f"border-radius:999px;font-size:0.7rem;margin-left:8px;'>🌍 FR→EN</span>"
-            if r["lang"] == "fr" else
-            f"<span style='background:#1e293b;color:#94a3b8;padding:2px 8px;"
-            f"border-radius:999px;font-size:0.7rem;margin-left:8px;'>🇬🇧 EN</span>"
-        )
-
-        transl_line = (
-            f"<p style='color:#64748b;font-size:0.78rem;margin:8px 0 0;font-style:italic;'>"
-            f"Traduit : &laquo; {safe_transl} &raquo;</p>"
-        ) if safe_transl else ""
-
-        card = (
-            f"<div style='background:{bg};border:1.5px solid {border};"
-            f"border-radius:14px;padding:20px 22px;margin-top:18px;box-shadow:{glow};'>"
-            f"<div style='display:flex;align-items:center;gap:12px;margin-bottom:16px;'>"
-            f"<span style='font-size:2.4rem;line-height:1;'>{emoji_r}</span>"
-            f"<div>"
-            f"<span style='color:{color};font-size:1.6rem;font-weight:800;letter-spacing:1px;'>{lbl}</span>"
-            f"{lang_badge}"
-            f"</div></div>"
-            f"<div style='background:rgba(255,255,255,0.04);border-left:3px solid {border};"
-            f"border-radius:0 6px 6px 0;padding:10px 14px;color:#cbd5e1;"
-            f"font-size:0.92rem;line-height:1.6;'>"
-            f"{safe_text}"
-            f"</div>"
-            f"{transl_line}"
-            f"<div style='margin-top:16px;'>"
-            f"<div style='display:flex;justify-content:space-between;"
-            f"color:#94a3b8;font-size:0.78rem;margin-bottom:6px;'>"
-            f"<span>Confiance du modèle</span>"
-            f"<span style='color:{color};font-weight:700;'>{pct}%</span></div>"
-            f"<div style='background:#1e293b;border-radius:999px;height:8px;overflow:hidden;'>"
-            f"<div style='width:{pct}%;height:100%;"
-            f"background:linear-gradient(90deg,{border},{color});"
-            f"border-radius:999px;'></div></div>"
-            f"</div>"
-            f"</div>"
-        )
-
-        st.markdown(card, unsafe_allow_html=True)
+    
+            import html as _html
+    
+            bg, border, glow, color, emoji_r, lbl = CFG[r["label"]]
+            pct        = int(r["score"] * 100)
+            safe_text  = _html.escape(r["text"])
+            safe_transl = _html.escape(r["translated"]) if r.get("translated") else None
+    
+            lang_badge = (
+                f"<span style='background:#1e3a5f;color:#93c5fd;padding:2px 8px;"
+                f"border-radius:999px;font-size:0.7rem;margin-left:8px;'>🌍 FR→EN</span>"
+                if r["lang"] == "fr" else
+                f"<span style='background:#1e293b;color:#94a3b8;padding:2px 8px;"
+                f"border-radius:999px;font-size:0.7rem;margin-left:8px;'>🇬🇧 EN</span>"
+            )
+    
+            transl_line = (
+                f"<p style='color:#64748b;font-size:0.78rem;margin:8px 0 0;font-style:italic;'>"
+                f"Traduit : &laquo; {safe_transl} &raquo;</p>"
+            ) if safe_transl else ""
+    
+            card = (
+                f"<div style='background:{bg};border:1.5px solid {border};"
+                f"border-radius:14px;padding:20px 22px;margin-top:18px;box-shadow:{glow};'>"
+                f"<div style='display:flex;align-items:center;gap:12px;margin-bottom:16px;'>"
+                f"<span style='font-size:2.4rem;line-height:1;'>{emoji_r}</span>"
+                f"<div>"
+                f"<span style='color:{color};font-size:1.6rem;font-weight:800;letter-spacing:1px;'>{lbl}</span>"
+                f"{lang_badge}"
+                f"</div></div>"
+                f"<div style='background:rgba(255,255,255,0.04);border-left:3px solid {border};"
+                f"border-radius:0 6px 6px 0;padding:10px 14px;color:#cbd5e1;"
+                f"font-size:0.92rem;line-height:1.6;'>"
+                f"{safe_text}"
+                f"</div>"
+                f"{transl_line}"
+                f"<div style='margin-top:16px;'>"
+                f"<div style='display:flex;justify-content:space-between;"
+                f"color:#94a3b8;font-size:0.78rem;margin-bottom:6px;'>"
+                f"<span>Confiance du modèle</span>"
+                f"<span style='color:{color};font-weight:700;'>{pct}%</span></div>"
+                f"<div style='background:#1e293b;border-radius:999px;height:8px;overflow:hidden;'>"
+                f"<div style='width:{pct}%;height:100%;"
+                f"background:linear-gradient(90deg,{border},{color});"
+                f"border-radius:999px;'></div></div>"
+                f"</div>"
+                f"</div>"
+            )
+    
+            st.markdown(card, unsafe_allow_html=True)
 
 
 # ────────────────────────────────────────────────
