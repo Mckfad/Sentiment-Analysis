@@ -474,7 +474,7 @@ with tab2:
             return c.get(val, "")
 
         st.dataframe(
-            df_res.style.applymap(color_sentiment, subset=["Sentiment"]),
+            df_res.style.map(color_sentiment, subset=["Sentiment"]),
             use_container_width=True, height=350
         )
 
