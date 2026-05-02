@@ -318,10 +318,6 @@ with tab1:
                 st.session_state.clear_input = True
                 st.rerun()
 
-        if st.session_state.last_result:
-            import html as _html
-            r = st.session_state.last_result
-
             CFG = {
                 "POSITIVE": ("#052e16", "#16a34a", "0 0 18px rgba(74,222,128,0.35)",  "#4ade80", "😊", "POSITIF"),
                 "NEGATIVE": ("#1c0707", "#dc2626", "0 0 18px rgba(248,113,113,0.35)", "#f87171", "😞", "NÉGATIF"),
