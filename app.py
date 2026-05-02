@@ -286,7 +286,6 @@ with tab1:
             with bcol:
                 if st.button(f"Ex.{i+1}", key=f"ex{i}", use_container_width=True):
                     st.session_state.example_text = ex
-                    st.rerun()
 
         user_text = st.text_area(
             "Entrez un avis (francais ou anglais) :",
@@ -447,7 +446,7 @@ with tab2:
             return c.get(val, "")
 
         st.dataframe(
-            df_res.style.applymap(color_sentiment, subset=["Sentiment"]),
+            df_res.style.map(color_sentiment, subset=["Sentiment"]),
             use_container_width=True, height=350
         )
 
