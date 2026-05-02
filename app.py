@@ -49,13 +49,11 @@ def load_model():
 
 @st.cache_resource(show_spinner="🌍 Chargement du traducteur FR→EN...")
 def load_translator():
-    from transformers import pipeline
-    # Modèle léger de traduction Helsinki-NLP (~300MB, très rapide)
-    return pipeline(
-        "translation",
-        model="Helsinki-NLP/opus-mt-fr-en",
-        max_length=512,
-    )
+    from transformers import MarianMTModel, MarianTokenizer
+    model_name = "Helsinki-NLP/opus-mt-fr-en"
+    tokenizer = MarianTokenizer.from_pretrained(model_name)
+    model = MarianMTModel.from_pretrained(model_name)
+    return tokenizer, model
 
 
 def detect_language(text: str) -> str:
@@ -123,7 +121,16 @@ def translate_if_needed(text: str, translator) -> tuple[str, str]:
     """
     lang = detect_language(text)
     if lang == "fr":
-        translated = translator(text)[0]["translation_text"]
+        tokenizer, model = translator
+        inputs = tokenizer(
+            [text],
+            return_tensors="pt",
+            padding=True,
+            truncation=True,
+            max_length=512,
+        )
+        translated_tokens = model.generate(**inputs)
+        translated = tokenizer.decode(translated_tokens[0], skip_special_tokens=True)
         return translated, "fr"
     return text, "en"
 
