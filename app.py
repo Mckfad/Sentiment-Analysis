@@ -52,10 +52,10 @@ def load_translator():
     from transformers import pipeline
     # Modèle léger de traduction Helsinki-NLP (~300MB, très rapide)
     return pipeline(
-        "translation",
-        model="Helsinki-NLP/opus-mt-fr-en",
-        max_length=512,
-    )
+    "translation_fr_to_en",
+    model="Helsinki-NLP/opus-mt-fr-en",
+    max_length=512,
+)
 
 
 def detect_language(text: str) -> str:
