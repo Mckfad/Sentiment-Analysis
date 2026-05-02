@@ -275,65 +275,63 @@ with tab1:
                 st.session_state.history = []
                 st.rerun()
 
-        with col_main:
-            if st.session_state.clear_input:
-                st.session_state.text_input = ""
-                st.session_state.clear_input = False
-        
-            st.markdown("**Exemples rapides**")
-            btn_cols = st.columns(5)
-            for i, (bcol, ex) in enumerate(zip(btn_cols, EXAMPLES)):
-                with bcol:
-                    if st.button(f"Ex.{i+1}", key=f"ex{i}", use_container_width=True):
-                        st.session_state["text_input"] = ex
-                        st.rerun()
-        
-            user_text = st.text_area(
-                "Entrez un avis (francais ou anglais) :",
-                height=140,
-                placeholder="Ex: Ce produit est absolument incroyable !",
-                key="text_input",
-            )
-        
-            if st.button("🔍 Analyser", type="primary", use_container_width=True):
-                if not user_text.strip():
-                    st.warning("Veuillez entrer un texte.")
-                else:
-                    with st.spinner("Analyse en cours..."):
-                        result = predict(user_text, pipe, translator)
-        
-                    st.session_state.last_result = {
-                        "text":       user_text,
-                        "label":      result["label"],
-                        "score":      result["score"],
-                        "lang":       result["lang"],
-                        "translated": result.get("translated"),
-                    }
-                    st.session_state.history.append({
-                        "text":  user_text,
-                        "label": result["label"],
-                        "score": result["score"],
-                        "lang":  result["lang"],
-                    })
-                    st.session_state.clear_input = True
-                    st.rerun()
-        
-            if st.session_state.last_result:
-                r = st.session_state.last_result
-    
+    with col_main:
+        if st.session_state.clear_input:
+            st.session_state.example_text = ""
+            st.session_state.clear_input = False
+
+        st.markdown("**Exemples rapides**")
+        btn_cols = st.columns(5)
+        for i, (bcol, ex) in enumerate(zip(btn_cols, EXAMPLES)):
+            with bcol:
+                if st.button(f"Ex.{i+1}", key=f"ex{i}", use_container_width=True):
+                    st.session_state.example_text = ex
+
+        user_text = st.text_area(
+            "Entrez un avis (francais ou anglais) :",
+            value=st.session_state.example_text,
+            height=140,
+            placeholder="Ex: Ce produit est absolument incroyable !",
+            key="text_input",
+        )
+
+        if st.button("🔍 Analyser", type="primary", use_container_width=True):
+            if not user_text.strip():
+                st.warning("Veuillez entrer un texte.")
+            else:
+                with st.spinner("Analyse en cours..."):
+                    result = predict(user_text, pipe, translator)
+
+                st.session_state.last_result = {
+                    "text":       user_text,
+                    "label":      result["label"],
+                    "score":      result["score"],
+                    "lang":       result["lang"],
+                    "translated": result.get("translated"),
+                }
+                st.session_state.history.append({
+                    "text":  user_text,
+                    "label": result["label"],
+                    "score": result["score"],
+                    "lang":  result["lang"],
+                })
+                st.session_state.clear_input = True
+                st.rerun()
+
+        if st.session_state.last_result:
+            import html as _html
+            r = st.session_state.last_result
+
             CFG = {
                 "POSITIVE": ("#052e16", "#16a34a", "0 0 18px rgba(74,222,128,0.35)",  "#4ade80", "😊", "POSITIF"),
                 "NEGATIVE": ("#1c0707", "#dc2626", "0 0 18px rgba(248,113,113,0.35)", "#f87171", "😞", "NÉGATIF"),
                 "NEUTRAL":  ("#1c1917", "#78716c", "0 0 18px rgba(168,162,158,0.25)", "#a8a29e", "😐", "NEUTRE"),
             }
-    
-            import html as _html
-    
             bg, border, glow, color, emoji_r, lbl = CFG[r["label"]]
             pct        = int(r["score"] * 100)
             safe_text  = _html.escape(r["text"])
             safe_transl = _html.escape(r["translated"]) if r.get("translated") else None
-    
+
             lang_badge = (
                 f"<span style='background:#1e3a5f;color:#93c5fd;padding:2px 8px;"
                 f"border-radius:999px;font-size:0.7rem;margin-left:8px;'>🌍 FR→EN</span>"
@@ -341,12 +339,11 @@ with tab1:
                 f"<span style='background:#1e293b;color:#94a3b8;padding:2px 8px;"
                 f"border-radius:999px;font-size:0.7rem;margin-left:8px;'>🇬🇧 EN</span>"
             )
-    
             transl_line = (
                 f"<p style='color:#64748b;font-size:0.78rem;margin:8px 0 0;font-style:italic;'>"
                 f"Traduit : &laquo; {safe_transl} &raquo;</p>"
             ) if safe_transl else ""
-    
+
             card = (
                 f"<div style='background:{bg};border:1.5px solid {border};"
                 f"border-radius:14px;padding:20px 22px;margin-top:18px;box-shadow:{glow};'>"
@@ -374,7 +371,6 @@ with tab1:
                 f"</div>"
                 f"</div>"
             )
-    
             st.markdown(card, unsafe_allow_html=True)
 
 
