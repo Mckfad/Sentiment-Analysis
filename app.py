@@ -1,7 +1,7 @@
 """
 app.py — Interface Streamlit pour l'analyse de sentiments
 Groupe 6 : Analyse des Avis Clients
-Modèle :RoBERTa | Dataset : IMDB
+Modèle : RoBERTa | Dataset : IMDB
 """
 
 import streamlit as st
@@ -33,12 +33,11 @@ st.markdown("""
 
 
 # ════════════════════════════════════════════════
-# Chargement du modèle + traducteur (mis en cache)
+# Chargement des modèles (mis en cache)
 # ════════════════════════════════════════════════
 @st.cache_resource(show_spinner="⏳ Chargement du modèle RoBERTa (3 classes)...")
 def load_model():
     from transformers import pipeline
-    # Modèle 3 classes natives : positive / neutral / negative
     return pipeline(
         "sentiment-analysis",
         model="cardiffnlp/twitter-roberta-base-sentiment-latest",
@@ -49,93 +48,81 @@ def load_model():
 
 @st.cache_resource(show_spinner="🌍 Chargement du traducteur FR→EN...")
 def load_translator():
-    from transformers import pipeline
-    # Modèle léger de traduction Helsinki-NLP (~300MB, très rapide)
-    return pipeline(
-    "translation_fr_to_en",
-    model="Helsinki-NLP/opus-mt-fr-en",
-    max_length=512,
-)
+    from transformers import MarianMTModel, MarianTokenizer
+    model_name = "Helsinki-NLP/opus-mt-fr-en"
+    tokenizer = MarianTokenizer.from_pretrained(model_name)
+    model = MarianMTModel.from_pretrained(model_name)
+    return tokenizer, model
 
 
+# ════════════════════════════════════════════════
+# Détection de langue
+# ════════════════════════════════════════════════
 def detect_language(text: str) -> str:
-    """
-    Détection de langue robuste.
-    1. Essaie langdetect (précis)
-    2. Fallback : dictionnaire étendu avec nettoyage de ponctuation
-    """
     import re as _re
-    # Nettoyage : enlever toute ponctuation pour le matching
     clean = _re.sub(r"[^\w\s]", " ", text.lower())
     clean = clean.replace("'", " ").replace("'", " ")
     words = set(clean.split())
 
-    # Tentative langdetect
     try:
         from langdetect import detect, DetectorFactory
         DetectorFactory.seed = 42
         lang = detect(text)
         if lang in ("fr", "en"):
             return lang
-        # Si autre langue détectée, vérifier quand même le dictionnaire
     except Exception:
         pass
 
-    # Fallback dictionnaire étendu (après nettoyage ponctuation)
     fr_markers = {
-        # Pronoms
         "je","tu","il","elle","nous","vous","ils","elles","on","me","te","lui","y",
-        # Articles & déterminants
         "le","la","les","un","une","des","du","au","aux","mon","ma","mes",
         "ton","ta","tes","son","sa","ses","notre","votre","leur","leurs",
-        # Mots outils
         "de","et","est","pas","ne","se","en","ce","qui","que","où","dont",
         "sur","avec","suis","bien","très","mais","pour","dans","par","sans",
         "plus","moins","ça","si","car","donc","puis","aussi","encore","même",
-        # Verbes courants
         "avoir","être","faire","aller","venir","voir","savoir","veux","peux",
-        "ai","as","avons","avez","ont","suis","es","sommes","êtes","sont",
+        "ai","as","avons","avez","ont","es","sommes","êtes","sont",
         "perdu","trouvé","aimé","détesté","adoré","voulu",
-        # Émotions & jugements
-        "content","heureux","triste","bon","mauvais","nul","bien","mal",
+        "content","heureux","triste","bon","mauvais","nul","mal",
         "super","génial","horrible","affreux","magnifique","excellent",
-        "dommage","bizarre","incroyable","parfait","terrible","incroyable",
-        # Argot & jurons (clé pour les avis familiers)
+        "dommage","bizarre","incroyable","parfait","terrible",
         "putain","merde","bordel","mince","flemme","chiant","relou","naze",
         "ouf","bof","mouais","ouais","wesh","oklm","trop","grave","vachement",
         "carrément","franchement","sympa","chouette","cool","nan","zéro",
-        "pourri","naze","galère","chiante","chiant","arnaque","déçu","déçue",
-        # Temps & quantificateurs
+        "pourri","galère","chiante","arnaque","déçu","déçue",
         "temps","rien","tout","tous","toute","toutes","quelque","aucun",
         "jamais","toujours","souvent","parfois","aujourd","hier","demain",
-        # Mots spécifiques français impossibles en anglais
-        "film","quel","quelle","quels","quelles","leur","leurs","mon","ton",
+        "film","quel","quelle","quels","quelles",
     }
     if len(words & fr_markers) >= 1:
         return "fr"
     return "en"
 
 
+# ════════════════════════════════════════════════
+# Traduction + Prédiction
+# ════════════════════════════════════════════════
 def translate_if_needed(text: str, translator) -> tuple[str, str]:
-    """
-    Traduit le texte en anglais si détecté comme français.
-    Retourne (texte_traduit, langue_détectée).
-    """
     lang = detect_language(text)
     if lang == "fr":
-        translated = translator(text)[0]["translation_text"]
+        tokenizer, model = translator
+        inputs = tokenizer(
+            [text],
+            return_tensors="pt",
+            padding=True,
+            truncation=True,
+            max_length=512,
+        )
+        translated_tokens = model.generate(**inputs)
+        translated = tokenizer.decode(translated_tokens[0], skip_special_tokens=True)
         return translated, "fr"
     return text, "en"
 
 
 def predict(text: str, pipe, translator) -> dict:
-    """
-    Analyse le sentiment avec RoBERTa 3 classes.
-    Le modèle retourne directement positive / neutral / negative.
-    """
     text_en, lang = translate_if_needed(text, translator)
     r = pipe(text_en)[0]
-    label = r["label"].upper()   # positive→POSITIVE, neutral→NEUTRAL, negative→NEGATIVE
+    label = r["label"].upper()
     return {
         "label": label,
         "score": round(r["score"], 4),
@@ -165,7 +152,7 @@ def predict_batch(texts: list, pipe, translator) -> list:
 
 
 # ════════════════════════════════════════════════
-# Baseline mots-clés (pour comparaison)
+# Baseline mots-clés
 # ════════════════════════════════════════════════
 POS_WORDS = {"great","excellent","amazing","wonderful","fantastic","good",
              "best","love","perfect","enjoyed","brilliant","superb"}
@@ -190,7 +177,6 @@ st.divider()
 
 tab1, tab2, tab3 = st.tabs(["📝 Avis Unique", "📦 Analyse en Batch", "📊 Performances"])
 
-
 # ── Session state ──
 if "example_text" not in st.session_state:
     st.session_state.example_text = ""
@@ -199,7 +185,8 @@ if "history" not in st.session_state:
 if "clear_input" not in st.session_state:
     st.session_state.clear_input = False
 if "last_result" not in st.session_state:
-    st.session_state.last_result = None   # dernier résultat affiché sous le bouton
+    st.session_state.last_result = None
+
 
 # ────────────────────────────────────────────────
 # TAB 1 — Avis unique + historique
@@ -217,7 +204,6 @@ with tab1:
 
     col_hist, col_main = st.columns([1, 2], gap="large")
 
-    # COLONNE GAUCHE : Historique
     with col_hist:
         st.markdown("### Historique")
         hist = st.session_state.history
@@ -273,7 +259,6 @@ with tab1:
             st.divider()
             st.markdown("**Dernieres analyses :**")
             for h in reversed(hist[-8:]):
-                emo_i = {"POSITIVE": "POS", "NEGATIVE": "NEG", "NEUTRAL": "NEU"}[h["label"]]
                 clr_i = {"POSITIVE": "#4ade80", "NEGATIVE": "#f87171", "NEUTRAL": "#a8a29e"}[h["label"]]
                 short = h["text"][:55] + ("..." if len(h["text"]) > 55 else "")
                 st.markdown(
@@ -290,7 +275,6 @@ with tab1:
                 st.session_state.history = []
                 st.rerun()
 
-    # COLONNE DROITE : Saisie
     with col_main:
         if st.session_state.clear_input:
             st.session_state.example_text = ""
@@ -319,7 +303,6 @@ with tab1:
                 with st.spinner("Analyse en cours..."):
                     result = predict(user_text, pipe, translator)
 
-                # Sauvegarder résultat ET texte original pour affichage persistant
                 st.session_state.last_result = {
                     "text":       user_text,
                     "label":      result["label"],
@@ -336,7 +319,6 @@ with tab1:
                 st.session_state.clear_input = True
                 st.rerun()
 
-        # ── Résultat persistant affiché sous le bouton ──
         if st.session_state.last_result:
             import html as _html
             r = st.session_state.last_result
@@ -348,7 +330,7 @@ with tab1:
             }
             bg, border, glow, color, emoji_r, lbl = CFG[r["label"]]
             pct        = int(r["score"] * 100)
-            safe_text  = _html.escape(r["text"])          # échapper < > " & etc.
+            safe_text  = _html.escape(r["text"])
             safe_transl = _html.escape(r["translated"]) if r.get("translated") else None
 
             lang_badge = (
@@ -366,21 +348,18 @@ with tab1:
             card = (
                 f"<div style='background:{bg};border:1.5px solid {border};"
                 f"border-radius:14px;padding:20px 22px;margin-top:18px;box-shadow:{glow};'>"
-
                 f"<div style='display:flex;align-items:center;gap:12px;margin-bottom:16px;'>"
                 f"<span style='font-size:2.4rem;line-height:1;'>{emoji_r}</span>"
                 f"<div>"
                 f"<span style='color:{color};font-size:1.6rem;font-weight:800;letter-spacing:1px;'>{lbl}</span>"
                 f"{lang_badge}"
                 f"</div></div>"
-
                 f"<div style='background:rgba(255,255,255,0.04);border-left:3px solid {border};"
                 f"border-radius:0 6px 6px 0;padding:10px 14px;color:#cbd5e1;"
                 f"font-size:0.92rem;line-height:1.6;'>"
                 f"{safe_text}"
                 f"</div>"
                 f"{transl_line}"
-
                 f"<div style='margin-top:16px;'>"
                 f"<div style='display:flex;justify-content:space-between;"
                 f"color:#94a3b8;font-size:0.78rem;margin-bottom:6px;'>"
@@ -391,11 +370,9 @@ with tab1:
                 f"background:linear-gradient(90deg,{border},{color});"
                 f"border-radius:999px;'></div></div>"
                 f"</div>"
-
                 f"</div>"
             )
             st.markdown(card, unsafe_allow_html=True)
-
 
 
 # ────────────────────────────────────────────────
@@ -443,7 +420,6 @@ with tab2:
         c2.metric("😞 Négatifs", f"{neg}", f"{neg/total*100:.1f}%")
         c3.metric("😐 Neutres",  f"{neu}", f"{neu/total*100:.1f}%")
 
-        # Donut chart
         fig, ax = plt.subplots(figsize=(4, 4))
         fig.patch.set_facecolor("#0f172a")
         ax.set_facecolor("#0f172a")
@@ -483,10 +459,8 @@ with tab2:
 # ────────────────────────────────────────────────
 # TAB 3 — Performances
 # ────────────────────────────────────────────────
-
 @st.cache_data(show_spinner=False)
 def run_evaluation(n_samples: int):
-    """Evalue RoBERTa vs Baseline sur n_samples exemples IMDB. Resultat mis en cache."""
     from datasets import load_dataset
     import random
     dataset = load_dataset("imdb", split="test")
@@ -520,7 +494,6 @@ def run_evaluation(n_samples: int):
 
 
 def display_eval_results(res):
-    """Affiche les metriques et graphiques a partir d'un dict de resultats."""
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("RoBERTa Accuracy", f"{res['acc_r']:.2%}",
               f"+{(res['acc_r']-res['acc_b']):.2%} vs baseline")
@@ -584,7 +557,6 @@ with tab3:
     )
     st.divider()
 
-    # ── Estimation des temps ──
     st.markdown("#### Choisir le nombre d'exemples à évaluer")
     st.markdown(
         "| n | Fiabilité | Temps estimé |\n"
@@ -600,43 +572,29 @@ with tab3:
         min_value=50, max_value=500, value=100, step=50,
     )
 
-    # Estimation dynamique selon n choisi
     if n_eval <= 50:
-        est = "~20 secondes"
-        fiab = "indicative"
-        color_est = "🟡"
+        est, fiab, color_est = "~20 secondes", "indicative", "🟡"
     elif n_eval <= 100:
-        est = "~40 secondes"
-        fiab = "correcte"
-        color_est = "🟡"
+        est, fiab, color_est = "~40 secondes", "correcte", "🟡"
     elif n_eval <= 200:
-        est = "~1 min 30"
-        fiab = "bonne ✅ recommandé"
-        color_est = "🟢"
+        est, fiab, color_est = "~1 min 30", "bonne ✅ recommandé", "🟢"
     elif n_eval <= 300:
-        est = "~2 min 30"
-        fiab = "très bonne"
-        color_est = "🟢"
+        est, fiab, color_est = "~2 min 30", "très bonne", "🟢"
     else:
-        est = f"~{n_eval // 100 * 1.5:.0f} min"
-        fiab = "excellente"
-        color_est = "🟢"
+        est, fiab, color_est = f"~{n_eval // 100 * 1.5:.0f} min", "excellente", "🟢"
 
     st.info(f"{color_est} **n={n_eval}** — Durée estimée : **{est}** · Fiabilité : {fiab}")
 
-    btn_label = f"▶️ Lancer l'évaluation sur {n_eval} exemples"
-    if st.button(btn_label, type="primary", use_container_width=True):
+    if st.button(f"▶️ Lancer l'évaluation sur {n_eval} exemples", type="primary", use_container_width=True):
         with st.spinner(f"Évaluation en cours sur {n_eval} exemples… ({est})"):
             res = run_evaluation(n_eval)
         st.session_state.eval_default = res
         st.rerun()
 
-    # ── Affichage des résultats si disponibles ──
     if "eval_default" in st.session_state:
         res = st.session_state.eval_default
         st.success(f"✅ Résultats sur **{res['n']} exemples IMDB** — instantané depuis la mémoire de session.")
         display_eval_results(res)
-        if st.button("🔄 Effacer et relancer une nouvelle évaluation",
-                     use_container_width=True):
+        if st.button("🔄 Effacer et relancer une nouvelle évaluation", use_container_width=True):
             del st.session_state.eval_default
             st.rerun()
