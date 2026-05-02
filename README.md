@@ -136,30 +136,6 @@ Ouvrir dans le navigateur : **http://localhost:8501**
 
 ---
 
-## ☁️ Déploiement sur HuggingFace Spaces
-
-### Étapes
-
-1. Créer un compte sur **https://huggingface.co**
-2. **New Space** → Nom : `sentiment-analysis` → SDK : **Streamlit** → Visibilité : Public
-3. Pousser le code :
-
-```bash
-# Option A — via Git directement sur HF Spaces
-git remote add space https://huggingface.co/spaces/TON-USERNAME/sentiment-analysis
-git push space main
-
-# Option B — lier le repo GitHub depuis l'interface HF Spaces
-# Settings → Repository → Link GitHub repo
-```
-
-4. Le build se lance automatiquement (~3-5 min)
-5. Lien public disponible : `https://huggingface.co/spaces/TON-USERNAME/sentiment-analysis`
-
-> Le fichier `.streamlit/config.toml` configure automatiquement le port 7860 requis par HuggingFace Spaces.
-
----
-
 ## 🧪 Dépendances principales
 
 ```
