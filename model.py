@@ -1,48 +1,45 @@
 """
-model.py — Chargement et inférence du modèle DistilBERT
-Modèle utilisé : distilbert-base-uncased-finetuned-sst-2-english (HuggingFace)
-Ce modèle préentraîné classe les textes en positif/négatif.
-On ajoute une logique de score pour détecter les avis neutres.
+model.py — Chargement et inférence du modèle RoBERTa
+Modèle utilisé : cardiffnlp/twitter-roberta-base-sentiment-latest (HuggingFace)
+Ce modèle préentraîné classe les textes en positif/neutre/négatif nativement.
 """
-
 from transformers import pipeline
 from typing import Union
-
 
 # ──────────────────────────────────────────────
 # Chargement du pipeline (une seule fois)
 # ──────────────────────────────────────────────
-print("⏳ Chargement du modèle DistilBERT...")
+print("⏳ Chargement du modèle RoBERTa...")
 sentiment_pipeline = pipeline(
     "sentiment-analysis",
-    model="distilbert-base-uncased-finetuned-sst-2-english",
+    model="cardiffnlp/twitter-roberta-base-sentiment-latest",
     truncation=True,
     max_length=512,
 )
 print("✅ Modèle chargé avec succès.")
 
+# Mapping des labels bruts du modèle
+LABEL_MAP = {
+    "positive": "POSITIVE",
+    "neutral":  "NEUTRAL",
+    "negative": "NEGATIVE",
+}
 
 # ──────────────────────────────────────────────
 # Fonction principale d'analyse
 # ──────────────────────────────────────────────
-def analyze_sentiment(text: str, neutral_threshold: float = 0.65) -> dict:
+def analyze_sentiment(text: str) -> dict:
     """
     Analyse le sentiment d'un texte.
-
     Retourne :
         - label : 'POSITIVE', 'NEUTRAL', ou 'NEGATIVE'
         - score : score de confiance (0 à 1)
-        - raw_label : label brut du modèle (POSITIVE/NEGATIVE)
+        - raw_label : label brut du modèle
     """
     result = sentiment_pipeline(text)[0]
-    raw_label = result["label"]   # POSITIVE ou NEGATIVE
-    score = result["score"]       # confiance
-
-    # Si la confiance est faible → NEUTRAL
-    if score < neutral_threshold:
-        label = "NEUTRAL"
-    else:
-        label = raw_label  # POSITIVE ou NEGATIVE
+    raw_label = result["label"].lower()
+    score = result["score"]
+    label = LABEL_MAP.get(raw_label, raw_label.upper())
 
     return {
         "label": label,
@@ -50,17 +47,16 @@ def analyze_sentiment(text: str, neutral_threshold: float = 0.65) -> dict:
         "raw_label": raw_label,
     }
 
-
-def analyze_batch(texts: list[str], neutral_threshold: float = 0.65) -> list[dict]:
+def analyze_batch(texts: list[str]) -> list[dict]:
     """
     Analyse une liste de textes en batch (plus rapide).
     """
     results = sentiment_pipeline(texts, batch_size=16, truncation=True, max_length=512)
     output = []
     for text, result in zip(texts, results):
-        raw_label = result["label"]
+        raw_label = result["label"].lower()
         score = result["score"]
-        label = "NEUTRAL" if score < neutral_threshold else raw_label
+        label = LABEL_MAP.get(raw_label, raw_label.upper())
         output.append({
             "text": text[:120] + "..." if len(text) > 120 else text,
             "label": label,
