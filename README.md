@@ -126,43 +126,10 @@ streamlit run app.py
 
 ---
 
-## ☁️ Déploiement HuggingFace Spaces
-
-```bash
-# 1. Créer un Space sur https://huggingface.co
-#    → New Space → SDK : Streamlit → Public
-
-# 2. Pousser le code
-git init
-git add app.py requirements.txt .streamlit/ README.md
-git commit -m "Groupe 6 - Analyse sentiments RoBERTa"
-git remote add space https://huggingface.co/spaces/TON-USERNAME/sentiment-analysis
-git push space main
-
-# Build automatique ~3-5 min → lien public disponible
-```
 
 ---
 
-## 📦 Dépendances
-
-```
-streamlit==1.35.0
-transformers==4.40.0
-torch==2.2.0
-datasets==2.19.0
-scikit-learn==1.4.2
-pandas==2.2.2
-matplotlib==3.8.4
-seaborn==0.13.2
-sentencepiece==0.2.0
-sacremoses==0.1.1
-langdetect==1.0.9
-```
-
----
-
-## 👥 Groupe 6 — Projet NLP
+## 👥 Mackéols FADEGNON — Projet NLP
 
 **Stack :** Python · Streamlit · HuggingFace Transformers · scikit-learn  
 **Modèles :** `cardiffnlp/twitter-roberta-base-sentiment-latest` · `Helsinki-NLP/opus-mt-fr-en`  
