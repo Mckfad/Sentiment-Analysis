@@ -12,14 +12,14 @@ from typing import Union
 # ──────────────────────────────────────────────
 # Chargement du pipeline (une seule fois)
 # ──────────────────────────────────────────────
-print("Chargement du modèle DistilBERT...")
+print("⏳ Chargement du modèle DistilBERT...")
 sentiment_pipeline = pipeline(
     "sentiment-analysis",
     model="distilbert-base-uncased-finetuned-sst-2-english",
     truncation=True,
     max_length=512,
 )
-print("Modèle chargé avec succès.")
+print("✅ Modèle chargé avec succès.")
 
 
 # ──────────────────────────────────────────────
