@@ -1,56 +1,54 @@
 # 🔍 Analyse des Avis Clients — Groupe 6
 
-> Application NLP d'analyse de sentiments basée sur **RoBERTa** (3 classes) avec traduction automatique FR→EN, interface Streamlit interactive et déploiement sur HuggingFace Spaces.
+> Application NLP d'analyse de sentiments basée sur **RoBERTa** (3 classes natives) avec traduction automatique FR→EN, interface Streamlit interactive et déploiement sur HuggingFace Spaces.
 
 ---
 
 ## 🌐 Application déployée
 
-👉 **https://huggingface.co/spaces/TON-USERNAME/sentiment-analysis**
+👉 **https://sentiment-analysis-cpyhvepdfafxafrywst7eg.streamlit.app/**
 
 ---
 
 ## 📌 Contexte
 
-Les entreprises cherchent à comprendre les retours clients pour améliorer leurs produits et services. Cette application analyse automatiquement des avis clients (Amazon, Trustpilot, IMDB…) et les classe en **Positif / Neutre / Négatif** grâce à un modèle NLP de pointe.
+Les entreprises cherchent à comprendre les retours clients pour améliorer leurs produits et services. Cette application analyse automatiquement des avis clients (Amazon, Trustpilot, IMDB…) et les classe en **Positif / Neutre / Négatif** grâce à un modèle NLP de pointe, avec support du **français et de l'anglais**.
 
 ---
 
 ## 🏗️ Architecture du projet
 
 ```
-sentiment_project/
-├── app.py              # Application Streamlit (interface complète)
-├── model.py            # Fonctions d'inférence RoBERTa
-├── data_loader.py      # Chargement dataset IMDB (HuggingFace)
-├── evaluate.py         # Script d'évaluation standalone (CLI)
+sentiment-analysis/
+├── app.py              # Application Streamlit complète (interface + logique NLP)
 ├── requirements.txt    # Dépendances Python
-└── .streamlit/
-    └── config.toml     # Configuration thème + port HuggingFace Spaces
+├── .streamlit/
+│   └── config.toml     # Configuration thème + port HuggingFace Spaces
+└── README.md
 ```
 
 ---
 
 ## 🤖 Modèles NLP utilisés
 
-| Rôle | Modèle | Source |
-|------|--------|--------|
-| **Analyse de sentiments** | `cardiffnlp/twitter-roberta-base-sentiment-latest` | HuggingFace 🤗 |
-| **Traduction FR→EN** | `Helsinki-NLP/opus-mt-fr-en` | HuggingFace 🤗 |
-| **Détection de langue** | `langdetect` + dictionnaire de fallback | PyPI |
+| Rôle | Modèle |
+|------|--------|
+| **Analyse de sentiments** | `cardiffnlp/twitter-roberta-base-sentiment-latest` |
+| **Traduction FR→EN** | `Helsinki-NLP/opus-mt-fr-en` (MarianMT) |
+| **Détection de langue** | `langdetect` + dictionnaire de fallback étendu |
 
-### Pourquoi RoBERTa ?
+### Pourquoi RoBERTa et pas DistilBERT ?
 
 | Critère | DistilBERT SST-2 | **RoBERTa (choisi)** |
 |---------|-----------------|----------------------|
-| Classes | 2 (pos/neg) | **3 (pos/neu/neg)** ✅ |
-| Données d'entraînement | Films | **Twitter multidomaine** ✅ |
-| Détection du neutre | Artificielle (seuil) | **Native** ✅ |
-| Taille | ~250 MB | ~500 MB |
+| Classes | 2 (positif / négatif) | **3 (positif / neutre / négatif)** ✅ |
+| Détection du neutre | Artificielle (seuil de confiance) | **Native** ✅ |
+| Données d'entraînement | Films uniquement | **Twitter multidomaine** ✅ |
+| Fiabilité sur argot/langage courant | Faible | **Bonne** ✅ |
 
 ---
 
-## 📦 Dataset
+## 📦 Dataset d'évaluation
 
 **IMDB Movie Reviews** — via HuggingFace Datasets
 
@@ -60,83 +58,93 @@ dataset = load_dataset("imdb")  # 50 000 avis (25k train / 25k test)
 ```
 
 - 🔗 https://huggingface.co/datasets/imdb
-- **50 000 avis** de films · Labels : Positif / Négatif
+- 50 000 avis de films · Labels : Positif / Négatif
 - Utilisé uniquement pour **évaluer les performances** du modèle (aucun réentraînement)
 
 ---
 
-## 🖥️ Fonctionnalités de l'application
+## 🖥️ Fonctionnalités
 
 ### 📝 Onglet — Avis Unique
-- Saisie libre d'un avis en **français ou en anglais**
-- **Détection automatique de la langue** (langdetect + dictionnaire étendu incluant argot, jurons)
-- **Traduction FR→EN** automatique avant l'analyse si nécessaire
-- Affichage du texte traduit pour vérification
-- **Carte résultat colorée** : vert (positif) / rouge (négatif) / gris (neutre) avec barre de confiance
-- **5 exemples rapides** (FR et EN) pour tester immédiatement
-- **Historique de session** en colonne gauche :
-  - Graphique donut mis à jour en temps réel
-  - Barres de progression par sentiment
-  - Liste des 8 dernières analyses
-  - Bouton pour effacer l'historique
-- Le champ de saisie se **vide automatiquement** après chaque analyse
+- Saisie libre en **français ou anglais**
+- Détection automatique de la langue (argot, jurons, expressions familières inclus)
+- Traduction FR→EN automatique avant analyse + affichage du texte traduit
+- **Carte résultat colorée** : vert (positif) / rouge (négatif) / gris (neutre) + barre de confiance
+- 5 exemples rapides (FR et EN)
+- **Historique de session** : graphique donut + barres de progression + liste des analyses
+- Champ de saisie vidé automatiquement après chaque analyse
 
 ### 📦 Onglet — Analyse en Batch
-- Saisie manuelle (1 avis par ligne)
-- Import de fichier **CSV** avec sélection de la colonne
-- Statistiques globales (% positif / négatif / neutre)
-- Graphique donut de répartition
-- Tableau coloré détaillé avec indicateur de langue
+- Saisie manuelle (1 avis par ligne) ou import **CSV**
+- Statistiques globales + graphique donut de répartition
+- Tableau coloré avec indicateur de langue par avis
 - Export des résultats en **CSV**
 
 ### 📊 Onglet — Performances
-- Choix libre du nombre d'exemples (**n = 50 à 500**)
-- Estimation du temps de calcul affichée dynamiquement :
-  - n=50 → ~20 sec · n=100 → ~40 sec · n=200 → ~1 min 30 · n=300+ → ~3 min+
-- Résultats **mis en cache** dans la session : un seul calcul par session, affichage instantané ensuite
-- Métriques affichées : **Accuracy, F1-score, Précision, Rappel**
-- **Rapport de classification** complet (tableau)
-- **Matrices de confusion** côte à côte (RoBERTa vs Baseline)
-- **Graphique comparatif** Précision / Rappel / F1 par classe
+- Choix libre du nombre d'exemples (n = 50 à 500) avec estimation du temps :
+
+| n | Fiabilité | Temps estimé |
+|---|-----------|--------------|
+| 50 | Indicative | ~20 sec |
+| 100 | Correcte | ~40 sec |
+| 200 | Bonne ✅ | ~1 min 30 |
+| 300+ | Très bonne | ~3 min+ |
+
+- Résultats mis en **cache session** : un seul calcul, affichage instantané ensuite
+- **Accuracy** et **F1-score** : RoBERTa vs Baseline (mots-clés)
+- Rapport de classification complet
+- Matrices de confusion côte à côte
+- Graphique comparatif Précision / Rappel / F1
 
 ---
 
-## 📊 Résultats de performance (référence n=200)
+## 📊 Résultats de référence (n=200)
 
-| Modèle | Accuracy | F1-score pondéré |
-|--------|----------|-----------------|
+| Modèle | Accuracy | F1-score |
+|--------|----------|----------|
 | **RoBERTa** | ~**93%** | ~**0.93** |
 | Baseline (mots-clés) | ~72% | ~0.71 |
 
-> Le modèle RoBERTa surpasse la baseline de +21 points d'accuracy, notamment grâce à sa compréhension contextuelle du langage.
-
 ---
 
-## 🚀 Installation et lancement local
+## 🚀 Lancement en local
 
-### 1. Cloner le dépôt
 ```bash
+# 1. Cloner
 git clone https://github.com/TON-USERNAME/sentiment-analysis.git
 cd sentiment-analysis
-```
 
-### 2. Installer les dépendances
-```bash
+# 2. Installer les dépendances
 pip install -r requirements.txt
-```
 
-> ⚠️ Au premier lancement, les modèles RoBERTa (~500 MB) et Helsinki (~300 MB) se téléchargent automatiquement depuis HuggingFace. Prévoir ~5 min selon la connexion.
-
-### 3. Lancer l'application
-```bash
+# 3. Lancer
 streamlit run app.py
+# → http://localhost:8501
 ```
 
-Ouvrir dans le navigateur : **http://localhost:8501**
+> ⚠️ Au premier lancement, les modèles RoBERTa (~500 MB) et Helsinki (~300 MB) se téléchargent automatiquement depuis HuggingFace.
 
 ---
 
-## 🧪 Dépendances principales
+## ☁️ Déploiement HuggingFace Spaces
+
+```bash
+# 1. Créer un Space sur https://huggingface.co
+#    → New Space → SDK : Streamlit → Public
+
+# 2. Pousser le code
+git init
+git add app.py requirements.txt .streamlit/ README.md
+git commit -m "Groupe 6 - Analyse sentiments RoBERTa"
+git remote add space https://huggingface.co/spaces/TON-USERNAME/sentiment-analysis
+git push space main
+
+# Build automatique ~3-5 min → lien public disponible
+```
+
+---
+
+## 📦 Dépendances
 
 ```
 streamlit==1.35.0
@@ -156,7 +164,6 @@ langdetect==1.0.9
 
 ## 👥 Groupe 6 — Projet NLP
 
-**Cours :** Traitement Automatique du Langage Naturel  
-**Dataset :** IMDB (HuggingFace)  
-**Modèles :** RoBERTa · Helsinki-NLP  
-**Stack :** Python · Streamlit · HuggingFace Transformers · scikit-learn
+**Stack :** Python · Streamlit · HuggingFace Transformers · scikit-learn  
+**Modèles :** `cardiffnlp/twitter-roberta-base-sentiment-latest` · `Helsinki-NLP/opus-mt-fr-en`  
+**Dataset :** IMDB (HuggingFace Datasets)
