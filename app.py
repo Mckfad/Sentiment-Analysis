@@ -16,6 +16,7 @@ from sklearn.metrics import (
     f1_score,
 )
 
+# ── Config page ───────────────────────────────
 st.set_page_config(
     page_title="Analyse des Avis Clients",
     page_icon="🔍",
@@ -31,7 +32,10 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 
-@st.cache_resource(show_spinner="⏳ Chargement du modèle RoBERTa...")
+# ════════════════════════════════════════════════
+# Chargement des modèles (mis en cache)
+# ════════════════════════════════════════════════
+@st.cache_resource(show_spinner="⏳ Chargement du modèle RoBERTa (3 classes)...")
 def load_model():
     from transformers import pipeline
     return pipeline(
@@ -51,11 +55,15 @@ def load_translator():
     return tokenizer, model
 
 
+# ════════════════════════════════════════════════
+# Détection de langue
+# ════════════════════════════════════════════════
 def detect_language(text: str) -> str:
     import re as _re
     clean = _re.sub(r"[^\w\s]", " ", text.lower())
     clean = clean.replace("'", " ").replace("'", " ")
     words = set(clean.split())
+
     try:
         from langdetect import detect, DetectorFactory
         DetectorFactory.seed = 42
@@ -64,6 +72,7 @@ def detect_language(text: str) -> str:
             return lang
     except Exception:
         pass
+
     fr_markers = {
         "je","tu","il","elle","nous","vous","ils","elles","on","me","te","lui","y",
         "le","la","les","un","une","des","du","au","aux","mon","ma","mes",
@@ -90,13 +99,19 @@ def detect_language(text: str) -> str:
     return "en"
 
 
+# ════════════════════════════════════════════════
+# Traduction + Prédiction
+# ════════════════════════════════════════════════
 def translate_if_needed(text: str, translator) -> tuple[str, str]:
     lang = detect_language(text)
     if lang == "fr":
         tokenizer, model = translator
         inputs = tokenizer(
-            [text], return_tensors="pt",
-            padding=True, truncation=True, max_length=512,
+            [text],
+            return_tensors="pt",
+            padding=True,
+            truncation=True,
+            max_length=512,
         )
         translated_tokens = model.generate(**inputs)
         translated = tokenizer.decode(translated_tokens[0], skip_special_tokens=True)
@@ -122,6 +137,7 @@ def predict_batch(texts: list, pipe, translator) -> list:
         t_en, lang = translate_if_needed(t, translator)
         texts_en.append(t_en)
         langs.append(lang)
+
     results = pipe(texts_en, batch_size=16, truncation=True, max_length=512)
     out = []
     for text, r, lang in zip(texts, results, langs):
@@ -135,6 +151,9 @@ def predict_batch(texts: list, pipe, translator) -> list:
     return out
 
 
+# ════════════════════════════════════════════════
+# Baseline mots-clés
+# ════════════════════════════════════════════════
 POS_WORDS = {"great","excellent","amazing","wonderful","fantastic","good",
              "best","love","perfect","enjoyed","brilliant","superb"}
 NEG_WORDS = {"bad","terrible","awful","horrible","worst","boring","poor",
@@ -146,24 +165,32 @@ def baseline(text: str) -> str:
     return "POSITIVE" if p > n else "NEGATIVE" if n > p else "NEUTRAL"
 
 
+# ════════════════════════════════════════════════
+# UI principale
+# ════════════════════════════════════════════════
 pipe = load_model()
 translator = load_translator()
 
 st.title("🔍 Analyse des Avis Clients")
-st.caption("Modèle : `cardiffnlp/twitter-roberta-base-sentiment-latest` · Traduction : `Helsinki-NLP/opus-mt-fr-en` · Dataset : IMDB · Groupe 6")
+st.caption("Modèle : `cardiffnlp/twitter-roberta-base-sentiment-latest` (3 classes) · Traduction FR→EN : `Helsinki-NLP/opus-mt-fr-en` · Dataset : IMDB · Groupe 6")
 st.divider()
 
 tab1, tab2, tab3 = st.tabs(["📝 Avis Unique", "📦 Analyse en Batch", "📊 Performances"])
 
+# ── Session state ──
+if "example_text" not in st.session_state:
+    st.session_state.example_text = ""
 if "history" not in st.session_state:
     st.session_state.history = []
+if "clear_input" not in st.session_state:
+    st.session_state.clear_input = False
 if "last_result" not in st.session_state:
     st.session_state.last_result = None
-if "text_input" not in st.session_state:
-    st.session_state.text_input = ""
 
 
-# ── TAB 1 ──────────────────────────────────────
+# ────────────────────────────────────────────────
+# TAB 1 — Avis unique + historique
+# ────────────────────────────────────────────────
 with tab1:
     st.subheader("Analyser un avis client")
 
@@ -181,7 +208,7 @@ with tab1:
         st.markdown("### Historique")
         hist = st.session_state.history
         if not hist:
-            st.caption("Aucune analyse effectuée pour l'instant.")
+            st.caption("Aucune analyse effectuée pour l'instant.\nLes résultats apparaîtront ici.")
         else:
             total_h = len(hist)
             counts = {"POSITIVE": 0, "NEGATIVE": 0, "NEUTRAL": 0}
@@ -193,24 +220,40 @@ with tab1:
             ax_h.set_facecolor("#0f172a")
             vals_h = [counts["POSITIVE"], counts["NEGATIVE"], counts["NEUTRAL"]]
             clrs_h = ["#4ade80", "#f87171", "#a8a29e"]
-            lbls_h = [f"Positif ({counts['POSITIVE']})", f"Negatif ({counts['NEGATIVE']})", f"Neutre ({counts['NEUTRAL']})"]
+            lbls_h = [
+                f"Positif ({counts['POSITIVE']})",
+                f"Negatif ({counts['NEGATIVE']})",
+                f"Neutre ({counts['NEUTRAL']})",
+            ]
             non_zero = [(v, c, l) for v, c, l in zip(vals_h, clrs_h, lbls_h) if v > 0]
             if non_zero:
                 vv, cc, ll = zip(*non_zero)
                 wedges_h, texts_h, auto_h = ax_h.pie(
-                    vv, labels=ll, autopct="%1.0f%%", colors=cc,
-                    startangle=90, wedgeprops={"width": 0.55},
+                    vv, labels=ll, autopct="%1.0f%%",
+                    colors=cc, startangle=90,
+                    wedgeprops={"width": 0.55},
                 )
                 for t in list(texts_h) + list(auto_h):
                     t.set_color("white")
                     t.set_fontsize(8)
-            ax_h.set_title(f"Repartition - {total_h} analyse{'s' if total_h > 1 else ''}", color="white", fontsize=9)
+            ax_h.set_title(
+                f"Repartition - {total_h} analyse{'s' if total_h > 1 else ''}",
+                color="white", fontsize=9,
+            )
             st.pyplot(fig_h, use_container_width=True)
             plt.close()
 
-            for lbl, clr, emo in [("POSITIVE","#4ade80","Positif"),("NEGATIVE","#f87171","Negatif"),("NEUTRAL","#a8a29e","Neutre")]:
+            for lbl, clr, emo in [
+                ("POSITIVE", "#4ade80", "Positif"),
+                ("NEGATIVE", "#f87171", "Negatif"),
+                ("NEUTRAL",  "#a8a29e", "Neutre"),
+            ]:
                 pct = counts[lbl] / total_h
-                st.markdown(f"**{emo}** <span style='color:{clr};'>{counts[lbl]} ({pct*100:.0f}%)</span>", unsafe_allow_html=True)
+                st.markdown(
+                    f"**{emo}** "
+                    f"<span style='color:{clr};'>{counts[lbl]} ({pct*100:.0f}%)</span>",
+                    unsafe_allow_html=True,
+                )
                 st.progress(pct)
 
             st.divider()
@@ -219,10 +262,12 @@ with tab1:
                 clr_i = {"POSITIVE": "#4ade80", "NEGATIVE": "#f87171", "NEUTRAL": "#a8a29e"}[h["label"]]
                 short = h["text"][:55] + ("..." if len(h["text"]) > 55 else "")
                 st.markdown(
-                    f"<div style='background:#1e293b;border-radius:8px;padding:8px 10px;margin-bottom:6px;font-size:0.8rem;'>"
+                    "<div style='background:#1e293b;border-radius:8px;padding:8px 10px;"
+                    "margin-bottom:6px;font-size:0.8rem;'>"
                     f"<span style='color:{clr_i};font-weight:bold;'>{h['label']}</span> "
                     f"<span style='color:#64748b;'>({h['score']*100:.0f}%)</span><br>"
-                    f"<span style='color:#94a3b8;'>{short}</span></div>",
+                    f"<span style='color:#94a3b8;'>{short}</span>"
+                    "</div>",
                     unsafe_allow_html=True,
                 )
 
@@ -231,16 +276,20 @@ with tab1:
                 st.rerun()
 
     with col_main:
+        if st.session_state.clear_input:
+            st.session_state.example_text = ""
+            st.session_state.clear_input = False
+
         st.markdown("**Exemples rapides**")
         btn_cols = st.columns(5)
         for i, (bcol, ex) in enumerate(zip(btn_cols, EXAMPLES)):
             with bcol:
                 if st.button(f"Ex.{i+1}", key=f"ex{i}", use_container_width=True):
-                    st.session_state.text_input = ex
-                    st.rerun()
+                    st.session_state.example_text = ex
 
         user_text = st.text_area(
             "Entrez un avis (francais ou anglais) :",
+            value=st.session_state.example_text,
             height=140,
             placeholder="Ex: Ce produit est absolument incroyable !",
             key="text_input",
@@ -252,56 +301,82 @@ with tab1:
             else:
                 with st.spinner("Analyse en cours..."):
                     result = predict(user_text, pipe, translator)
+
                 st.session_state.last_result = {
-                    "text": user_text, "label": result["label"],
-                    "score": result["score"], "lang": result["lang"],
+                    "text":       user_text,
+                    "label":      result["label"],
+                    "score":      result["score"],
+                    "lang":       result["lang"],
                     "translated": result.get("translated"),
                 }
                 st.session_state.history.append({
-                    "text": user_text, "label": result["label"],
-                    "score": result["score"], "lang": result["lang"],
+                    "text":  user_text,
+                    "label": result["label"],
+                    "score": result["score"],
+                    "lang":  result["lang"],
                 })
-                st.session_state.text_input = ""
+                st.session_state.clear_input = True
                 st.rerun()
 
         if st.session_state.last_result:
             import html as _html
             r = st.session_state.last_result
+
             CFG = {
-                "POSITIVE": ("#052e16","#16a34a","0 0 18px rgba(74,222,128,0.35)","#4ade80","😊","POSITIF"),
-                "NEGATIVE": ("#1c0707","#dc2626","0 0 18px rgba(248,113,113,0.35)","#f87171","😞","NÉGATIF"),
-                "NEUTRAL":  ("#1c1917","#78716c","0 0 18px rgba(168,162,158,0.25)","#a8a29e","😐","NEUTRE"),
+                "POSITIVE": ("#052e16", "#16a34a", "0 0 18px rgba(74,222,128,0.35)",  "#4ade80", "😊", "POSITIF"),
+                "NEGATIVE": ("#1c0707", "#dc2626", "0 0 18px rgba(248,113,113,0.35)", "#f87171", "😞", "NÉGATIF"),
+                "NEUTRAL":  ("#1c1917", "#78716c", "0 0 18px rgba(168,162,158,0.25)", "#a8a29e", "😐", "NEUTRE"),
             }
             bg, border, glow, color, emoji_r, lbl = CFG[r["label"]]
-            pct = int(r["score"] * 100)
-            safe_text = _html.escape(r["text"])
+            pct        = int(r["score"] * 100)
+            safe_text  = _html.escape(r["text"])
             safe_transl = _html.escape(r["translated"]) if r.get("translated") else None
+
             lang_badge = (
-                f"<span style='background:#1e3a5f;color:#93c5fd;padding:2px 8px;border-radius:999px;font-size:0.7rem;margin-left:8px;'>🌍 FR→EN</span>"
+                f"<span style='background:#1e3a5f;color:#93c5fd;padding:2px 8px;"
+                f"border-radius:999px;font-size:0.7rem;margin-left:8px;'>🌍 FR→EN</span>"
                 if r["lang"] == "fr" else
-                f"<span style='background:#1e293b;color:#94a3b8;padding:2px 8px;border-radius:999px;font-size:0.7rem;margin-left:8px;'>🇬🇧 EN</span>"
+                f"<span style='background:#1e293b;color:#94a3b8;padding:2px 8px;"
+                f"border-radius:999px;font-size:0.7rem;margin-left:8px;'>🇬🇧 EN</span>"
             )
             transl_line = (
-                f"<p style='color:#64748b;font-size:0.78rem;margin:8px 0 0;font-style:italic;'>Traduit : &laquo; {safe_transl} &raquo;</p>"
+                f"<p style='color:#64748b;font-size:0.78rem;margin:8px 0 0;font-style:italic;'>"
+                f"Traduit : &laquo; {safe_transl} &raquo;</p>"
             ) if safe_transl else ""
+
             card = (
-                f"<div style='background:{bg};border:1.5px solid {border};border-radius:14px;padding:20px 22px;margin-top:18px;box-shadow:{glow};'>"
+                f"<div style='background:{bg};border:1.5px solid {border};"
+                f"border-radius:14px;padding:20px 22px;margin-top:18px;box-shadow:{glow};'>"
                 f"<div style='display:flex;align-items:center;gap:12px;margin-bottom:16px;'>"
                 f"<span style='font-size:2.4rem;line-height:1;'>{emoji_r}</span>"
-                f"<div><span style='color:{color};font-size:1.6rem;font-weight:800;letter-spacing:1px;'>{lbl}</span>{lang_badge}</div></div>"
-                f"<div style='background:rgba(255,255,255,0.04);border-left:3px solid {border};border-radius:0 6px 6px 0;padding:10px 14px;color:#cbd5e1;font-size:0.92rem;line-height:1.6;'>{safe_text}</div>"
+                f"<div>"
+                f"<span style='color:{color};font-size:1.6rem;font-weight:800;letter-spacing:1px;'>{lbl}</span>"
+                f"{lang_badge}"
+                f"</div></div>"
+                f"<div style='background:rgba(255,255,255,0.04);border-left:3px solid {border};"
+                f"border-radius:0 6px 6px 0;padding:10px 14px;color:#cbd5e1;"
+                f"font-size:0.92rem;line-height:1.6;'>"
+                f"{safe_text}"
+                f"</div>"
                 f"{transl_line}"
                 f"<div style='margin-top:16px;'>"
-                f"<div style='display:flex;justify-content:space-between;color:#94a3b8;font-size:0.78rem;margin-bottom:6px;'>"
-                f"<span>Confiance du modèle</span><span style='color:{color};font-weight:700;'>{pct}%</span></div>"
+                f"<div style='display:flex;justify-content:space-between;"
+                f"color:#94a3b8;font-size:0.78rem;margin-bottom:6px;'>"
+                f"<span>Confiance du modèle</span>"
+                f"<span style='color:{color};font-weight:700;'>{pct}%</span></div>"
                 f"<div style='background:#1e293b;border-radius:999px;height:8px;overflow:hidden;'>"
-                f"<div style='width:{pct}%;height:100%;background:linear-gradient(90deg,{border},{color});border-radius:999px;'></div></div>"
-                f"</div></div>"
+                f"<div style='width:{pct}%;height:100%;"
+                f"background:linear-gradient(90deg,{border},{color});"
+                f"border-radius:999px;'></div></div>"
+                f"</div>"
+                f"</div>"
             )
             st.markdown(card, unsafe_allow_html=True)
 
 
-# ── TAB 2 ──────────────────────────────────────
+# ────────────────────────────────────────────────
+# TAB 2 — Batch
+# ────────────────────────────────────────────────
 with tab2:
     st.subheader("Analyse en lot")
     st.caption("Entrez un avis par ligne, ou uploadez un fichier CSV.")
@@ -348,9 +423,12 @@ with tab2:
         fig.patch.set_facecolor("#0f172a")
         ax.set_facecolor("#0f172a")
         wedges, labels_, autopcts = ax.pie(
-            [pos, neg, neu], labels=["Positif","Négatif","Neutre"],
-            autopct="%1.1f%%", colors=["#4ade80","#f87171","#a8a29e"],
-            startangle=90, wedgeprops={"width": 0.5},
+            [pos, neg, neu],
+            labels=["Positif", "Négatif", "Neutre"],
+            autopct="%1.1f%%",
+            colors=["#4ade80", "#f87171", "#a8a29e"],
+            startangle=90,
+            wedgeprops={"width": 0.5},
         )
         for t in labels_ + autopcts:
             t.set_color("white")
@@ -373,10 +451,13 @@ with tab2:
         )
 
         csv = df_res.to_csv(index=False).encode("utf-8")
-        st.download_button("⬇️ Télécharger les résultats (CSV)", csv, "resultats_sentiments.csv", "text/csv")
+        st.download_button("⬇️ Télécharger les résultats (CSV)", csv,
+                           "resultats_sentiments.csv", "text/csv")
 
 
-# ── TAB 3 ──────────────────────────────────────
+# ────────────────────────────────────────────────
+# TAB 3 — Performances
+# ────────────────────────────────────────────────
 @st.cache_data(show_spinner=False)
 def run_evaluation(n_samples: int):
     from datasets import load_dataset
@@ -398,10 +479,13 @@ def run_evaluation(n_samples: int):
     acc_b  = accuracy_score(y_true, y_base)
     f1_r   = f1_score(y_true, y_roberta, average="weighted")
     f1_b   = f1_score(y_true, y_base,    average="weighted")
-    report_r = classification_report(y_true, y_roberta, target_names=["NEGATIVE","POSITIVE"], output_dict=True)
-    report_b = classification_report(y_true, y_base,    target_names=["NEGATIVE","POSITIVE"], output_dict=True)
+    report_r = classification_report(y_true, y_roberta,
+                                     target_names=["NEGATIVE","POSITIVE"], output_dict=True)
+    report_b = classification_report(y_true, y_base,
+                                     target_names=["NEGATIVE","POSITIVE"], output_dict=True)
     return {
-        "acc_r": acc_r, "acc_b": acc_b, "f1_r": f1_r, "f1_b": f1_b,
+        "acc_r": acc_r, "acc_b": acc_b,
+        "f1_r":  f1_r,  "f1_b":  f1_b,
         "report_r": report_r, "report_b": report_b,
         "y_true": y_true, "y_roberta": y_roberta, "y_base": y_base,
         "n": n_samples,
@@ -410,10 +494,11 @@ def run_evaluation(n_samples: int):
 
 def display_eval_results(res):
     c1, c2, c3, c4 = st.columns(4)
-    c1.metric("RoBERTa Accuracy", f"{res['acc_r']:.2%}", f"+{(res['acc_r']-res['acc_b']):.2%} vs baseline")
-    c2.metric("Baseline Accuracy",  f"{res['acc_b']:.2%}")
-    c3.metric("RoBERTa F1-score",   f"{res['f1_r']:.4f}")
-    c4.metric("Baseline F1-score",  f"{res['f1_b']:.4f}")
+    c1.metric("RoBERTa Accuracy", f"{res['acc_r']:.2%}",
+              f"+{(res['acc_r']-res['acc_b']):.2%} vs baseline")
+    c2.metric("Baseline Accuracy",   f"{res['acc_b']:.2%}")
+    c3.metric("RoBERTa F1-score",    f"{res['f1_r']:.4f}")
+    c4.metric("Baseline F1-score",   f"{res['f1_b']:.4f}")
 
     st.divider()
     st.subheader("Rapport de classification — RoBERTa")
@@ -423,10 +508,13 @@ def display_eval_results(res):
     st.subheader("Matrices de Confusion")
     fig, axes = plt.subplots(1, 2, figsize=(12, 4))
     fig.patch.set_facecolor("#1e293b")
-    for ax, preds, title in zip(axes, [res["y_roberta"], res["y_base"]], ["RoBERTa", "Baseline (mots-cles)"]):
+    for ax, preds, title in zip(axes,
+                                [res["y_roberta"], res["y_base"]],
+                                ["RoBERTa", "Baseline (mots-cles)"]):
         cm = confusion_matrix(res["y_true"], preds)
         sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", ax=ax,
-                    xticklabels=["NEGATIVE","POSITIVE"], yticklabels=["NEGATIVE","POSITIVE"])
+                    xticklabels=["NEGATIVE","POSITIVE"],
+                    yticklabels=["NEGATIVE","POSITIVE"])
         ax.set_title(title, color="white", fontsize=13)
         ax.set_xlabel("Predit", color="white")
         ax.set_ylabel("Reel", color="white")
@@ -443,8 +531,10 @@ def display_eval_results(res):
     fig2.patch.set_facecolor("#1e293b")
     for ax, cls in zip(axes2, ["NEGATIVE", "POSITIVE"]):
         ax.set_facecolor("#0f172a")
-        b1 = ax.bar(x - width/2, [res["report_r"][cls][m] for m in metrics], width, label="RoBERTa",  color="#4C9BE8")
-        b2 = ax.bar(x + width/2, [res["report_b"][cls][m] for m in metrics], width, label="Baseline", color="#E88B4C")
+        b1 = ax.bar(x - width/2, [res["report_r"][cls][m] for m in metrics],
+                    width, label="RoBERTa",  color="#4C9BE8")
+        b2 = ax.bar(x + width/2, [res["report_b"][cls][m] for m in metrics],
+                    width, label="Baseline", color="#E88B4C")
         ax.set_title(f"Classe : {cls}", color="white")
         ax.set_xticks(x)
         ax.set_xticklabels(metrics, color="white")
@@ -460,23 +550,37 @@ def display_eval_results(res):
 
 with tab3:
     st.subheader("📊 Performances du modèle RoBERTa")
-    st.markdown("Évaluation sur le dataset **IMDB** · Comparaison **RoBERTa vs Baseline** · Métriques : Précision · Rappel · F1-score · Accuracy")
+    st.markdown(
+        "Évaluation sur le dataset **IMDB** · Comparaison **RoBERTa vs Baseline (mots-clés)** · "
+        "Métriques : Précision · Rappel · F1-score · Accuracy"
+    )
     st.divider()
 
     st.markdown("#### Choisir le nombre d'exemples à évaluer")
     st.markdown(
-        "| n | Fiabilité | Temps estimé |\n|---|---|---|\n"
-        "| **50** | Indicative | ~20 sec |\n| **100** | Correcte | ~40 sec |\n"
-        "| **200** | Bonne (recommandé) | ~1 min 30 |\n| **300+** | Très bonne | ~3 min+ |"
+        "| n | Fiabilité | Temps estimé |\n"
+        "|---|---|---|\n"
+        "| **50** | Indicative | ~20 sec |\n"
+        "| **100** | Correcte | ~40 sec |\n"
+        "| **200** | Bonne (recommandé) | ~1 min 30 |\n"
+        "| **300+** | Très bonne | ~3 min+ |"
     )
 
-    n_eval = st.slider("Nombre d'exemples IMDB", min_value=50, max_value=500, value=100, step=50)
+    n_eval = st.slider(
+        "Nombre d'exemples IMDB",
+        min_value=50, max_value=500, value=100, step=50,
+    )
 
-    if n_eval <= 50:   est, fiab, color_est = "~20 secondes", "indicative", "🟡"
-    elif n_eval <= 100: est, fiab, color_est = "~40 secondes", "correcte", "🟡"
-    elif n_eval <= 200: est, fiab, color_est = "~1 min 30", "bonne ✅ recommandé", "🟢"
-    elif n_eval <= 300: est, fiab, color_est = "~2 min 30", "très bonne", "🟢"
-    else:               est, fiab, color_est = f"~{n_eval // 100 * 1.5:.0f} min", "excellente", "🟢"
+    if n_eval <= 50:
+        est, fiab, color_est = "~20 secondes", "indicative", "🟡"
+    elif n_eval <= 100:
+        est, fiab, color_est = "~40 secondes", "correcte", "🟡"
+    elif n_eval <= 200:
+        est, fiab, color_est = "~1 min 30", "bonne ✅ recommandé", "🟢"
+    elif n_eval <= 300:
+        est, fiab, color_est = "~2 min 30", "très bonne", "🟢"
+    else:
+        est, fiab, color_est = f"~{n_eval // 100 * 1.5:.0f} min", "excellente", "🟢"
 
     st.info(f"{color_est} **n={n_eval}** — Durée estimée : **{est}** · Fiabilité : {fiab}")
 
