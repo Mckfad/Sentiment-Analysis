@@ -276,51 +276,50 @@ with tab1:
                 st.rerun()
 
         with col_main:
-        if st.session_state.clear_input:
-            st.session_state.text_input = ""
-            st.session_state.clear_input = False
-    
-        st.markdown("**Exemples rapides**")
-        btn_cols = st.columns(5)
-        for i, (bcol, ex) in enumerate(zip(btn_cols, EXAMPLES)):
-            with bcol:
-                if st.button(f"Ex.{i+1}", key=f"ex{i}", use_container_width=True):
-                    st.session_state["text_input"] = ex
+            if st.session_state.clear_input:
+                st.session_state.text_input = ""
+                st.session_state.clear_input = False
+        
+            st.markdown("**Exemples rapides**")
+            btn_cols = st.columns(5)
+            for i, (bcol, ex) in enumerate(zip(btn_cols, EXAMPLES)):
+                with bcol:
+                    if st.button(f"Ex.{i+1}", key=f"ex{i}", use_container_width=True):
+                        st.session_state["text_input"] = ex
+                        st.rerun()
+        
+            user_text = st.text_area(
+                "Entrez un avis (francais ou anglais) :",
+                height=140,
+                placeholder="Ex: Ce produit est absolument incroyable !",
+                key="text_input",
+            )
+        
+            if st.button("🔍 Analyser", type="primary", use_container_width=True):
+                if not user_text.strip():
+                    st.warning("Veuillez entrer un texte.")
+                else:
+                    with st.spinner("Analyse en cours..."):
+                        result = predict(user_text, pipe, translator)
+        
+                    st.session_state.last_result = {
+                        "text":       user_text,
+                        "label":      result["label"],
+                        "score":      result["score"],
+                        "lang":       result["lang"],
+                        "translated": result.get("translated"),
+                    }
+                    st.session_state.history.append({
+                        "text":  user_text,
+                        "label": result["label"],
+                        "score": result["score"],
+                        "lang":  result["lang"],
+                    })
+                    st.session_state.clear_input = True
                     st.rerun()
-    
-        user_text = st.text_area(
-            "Entrez un avis (francais ou anglais) :",
-            height=140,
-            placeholder="Ex: Ce produit est absolument incroyable !",
-            key="text_input",
-        )
-    
-        if st.button("🔍 Analyser", type="primary", use_container_width=True):
-            if not user_text.strip():
-                st.warning("Veuillez entrer un texte.")
-            else:
-                with st.spinner("Analyse en cours..."):
-                    result = predict(user_text, pipe, translator)
-    
-                st.session_state.last_result = {
-                    "text":       user_text,
-                    "label":      result["label"],
-                    "score":      result["score"],
-                    "lang":       result["lang"],
-                    "translated": result.get("translated"),
-                }
-                st.session_state.history.append({
-                    "text":  user_text,
-                    "label": result["label"],
-                    "score": result["score"],
-                    "lang":  result["lang"],
-                })
-                st.session_state.clear_input = True
-                st.rerun()
-    
-        # ✅ FIX : récupération correcte du résultat
-        if st.session_state.last_result:
-            r = st.session_state.last_result
+        
+            if st.session_state.last_result:
+                r = st.session_state.last_result
     
             CFG = {
                 "POSITIVE": ("#052e16", "#16a34a", "0 0 18px rgba(74,222,128,0.35)",  "#4ade80", "😊", "POSITIF"),
