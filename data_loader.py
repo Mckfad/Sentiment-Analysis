@@ -22,7 +22,7 @@ def load_imdb_sample(n_samples: int = 500, split: str = "test", seed: int = 42) 
         DataFrame avec colonnes ['text', 'true_label']
         true_label : 0 = négatif, 1 = positif
     """
-    print(f"📥 Chargement du dataset IMDB ({split}, {n_samples} exemples)...")
+    print(f" Chargement du dataset IMDB ({split}, {n_samples} exemples)...")
     dataset = load_dataset("imdb", split=split)
 
     # Sélection aléatoire reproductible
@@ -38,7 +38,7 @@ def load_imdb_sample(n_samples: int = 500, split: str = "test", seed: int = 42) 
     # Ajout d'une colonne lisible
     df["true_sentiment"] = df["true_label"].map({0: "NEGATIVE", 1: "POSITIVE"})
 
-    print(f"✅ Dataset chargé : {len(df)} avis | "
+    print(f" Dataset chargé : {len(df)} avis | "
           f"Positifs: {df['true_label'].sum()} | "
           f"Négatifs: {(df['true_label']==0).sum()}")
     return df
