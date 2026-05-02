@@ -9,14 +9,14 @@ from typing import Union
 # ──────────────────────────────────────────────
 # Chargement du pipeline (une seule fois)
 # ──────────────────────────────────────────────
-print("⏳ Chargement du modèle RoBERTa...")
+print("Chargement du modèle RoBERTa...")
 sentiment_pipeline = pipeline(
     "sentiment-analysis",
     model="cardiffnlp/twitter-roberta-base-sentiment-latest",
     truncation=True,
     max_length=512,
 )
-print("✅ Modèle chargé avec succès.")
+print(" Modèle chargé avec succès.")
 
 # Mapping des labels bruts du modèle
 LABEL_MAP = {
