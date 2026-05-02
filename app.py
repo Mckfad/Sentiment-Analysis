@@ -1,7 +1,7 @@
 """
 app.py — Interface Streamlit pour l'analyse de sentiments
 Groupe 6 : Analyse des Avis Clients
-Modèle : DistilBERT | Dataset : IMDB
+Modèle : RoBERTa | Dataset : IMDB
 """
 
 import streamlit as st
