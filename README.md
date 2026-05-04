@@ -22,8 +22,6 @@ Les entreprises cherchent à comprendre les retours clients pour améliorer leur
 sentiment-analysis/
 ├── app.py              # Application Streamlit complète (interface + logique NLP)
 ├── requirements.txt    # Dépendances Python
-├── .streamlit/
-│   └── config.toml     # Configuration thème + port HuggingFace Spaces
 └── README.md
 ```
 
